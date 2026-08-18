@@ -1,5 +1,4 @@
-# HTML → Figma（原型导入）
-
+# HTML → Figma
 一个 Figma 插件：把 AI 生成的本地 HTML 原型文件一键转为**可编辑**的 Figma 设计页，用于快速绘制原型图。
 
 ## 这是什么
@@ -18,7 +17,7 @@
   - 支持 hash 路由（`#/home` 这种）的多页面原型，每个路由会生成一个页面
   - 依赖远程 CDN 的 HTML 可以导入，但远程样式 / 图片会缺失（见「常见问题」）
 
-## 安装（只需一次）
+## 安装
 
 1. 把本项目代码拿到本地：`git clone https://github.com/lived0223/html-to-figma.git`（或打开仓库页面点 **Code → Download ZIP** 后解压）
 2. 打开 **Figma 桌面版**并登录账号
