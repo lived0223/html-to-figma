@@ -37,6 +37,7 @@
 3. **③ 要导出的路由 / 页面** —— 自动填充了探测到的路由（每行一个，如 `#/home`）。只想导出部分页面就删掉不需要的行；也可以手动添加
 4. 点击 **「生成到 Figma」**，等待进度条走完
 5. 生成完成后，Figma 会自动切换到新建的页面，可直接在画布上编辑每个元素
+<img width="1878" height="1302" alt="image" src="https://github.com/user-attachments/assets/f1e812a7-20fa-486b-9bfa-6a7185d43a12" />
 
 ## 常见问题
 
