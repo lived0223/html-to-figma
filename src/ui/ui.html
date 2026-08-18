@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML to Figma</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f6f8;
+    --border: #e3e5e8;
+    --text: #1f2329;
+    --muted: #7a8190;
+    --primary: #1e40af;
+    --primary-hover: #1e3a8a;
+    --ok: #15803d;
+    --err: #b91c1c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 16px;
+  }
+  h1 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
+  .field > label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 6px; }
+  input[type="file"] { display: block; width: 100%; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input[type="number"] { width: 90px; }
+  input, select, textarea {
+    font-family: inherit; font-size: 12px; color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+    background: var(--bg); width: 100%;
+  }
+  textarea { resize: vertical; min-height: 90px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; line-height: 1.6; }
+  button {
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    border: none; border-radius: 6px; padding: 8px 14px; cursor: pointer;
+  }
+  .btn-primary { background: var(--primary); color: #fff; width: 100%; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary:disabled { background: #9db0d8; cursor: not-allowed; }
+  #log {
+    margin-top: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px; height: 130px; overflow: auto;
+    font-size: 11px; font-family: ui-monospace, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  #log .ok { color: var(--ok); }
+  #log .err { color: var(--err); }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .progress { margin-top: 10px; height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; display: none; }
+  .progress > div { height: 100%; background: var(--primary); width: 0; transition: width .2s; }
+</style>
+</head>
+<body>
+  <h1>HTML → Figma 原型导入</h1>
+  <div class="sub">把本地 HTML 原型文件转为可编辑的 Figma 页面</div>
+
+  <div class="field">
+    <label>1. 选择 HTML 文件</label>
+    <input type="file" id="file" accept=".html,.htm">
+  </div>
+
+  <div class="field">
+    <div class="row">
+      <label style="margin:0">2. 设计稿宽度 (px)</label>
+      <input type="number" id="width" value="1280" min="320" step="10">
+    </div>
+    <div class="hint">iframe 渲染宽度；前台站点设计稿常为 1280 / 1440</div>
+  </div>
+
+  <div class="field">
+    <label>3. 要导出的路由 / 页面（每行一个，支持 #/ 前缀）</label>
+    <textarea id="routes" placeholder="每行一个路由，如 #/home"></textarea>
+    <div class="hint">默认自动填充本文件支持的全部路由；无需全部时可删减</div>
+  </div>
+
+  <button class="btn-primary" id="go" disabled>生成到 Figma</button>
+  <div class="progress" id="progress"><div id="progressBar"></div></div>
+  <div id="log"></div>
+
+  <!--__UI_SCRIPT__-->
+</body>
+</html>

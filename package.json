@@ -1,0 +1,17 @@
+{
+  "name": "html-to-figma",
+  "version": "0.1.0",
+  "description": "Figma plugin: convert local HTML prototype files into editable Figma design pages",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.100.0",
+    "esbuild": "^0.24.0",
+    "puppeteer-core": "^25.8.0",
+    "typescript": "^5.6.0"
+  }
+}

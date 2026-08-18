@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML to Figma</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f6f8;
+    --border: #e3e5e8;
+    --text: #1f2329;
+    --muted: #7a8190;
+    --primary: #1e40af;
+    --primary-hover: #1e3a8a;
+    --ok: #15803d;
+    --err: #b91c1c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 16px;
+  }
+  h1 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
+  .field > label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 6px; }
+  input[type="file"] { display: block; width: 100%; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input[type="number"] { width: 90px; }
+  input, select, textarea {
+    font-family: inherit; font-size: 12px; color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+    background: var(--bg); width: 100%;
+  }
+  textarea { resize: vertical; min-height: 90px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; line-height: 1.6; }
+  button {
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    border: none; border-radius: 6px; padding: 8px 14px; cursor: pointer;
+  }
+  .btn-primary { background: var(--primary); color: #fff; width: 100%; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary:disabled { background: #9db0d8; cursor: not-allowed; }
+  #log {
+    margin-top: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px; height: 130px; overflow: auto;
+    font-size: 11px; font-family: ui-monospace, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  #log .ok { color: var(--ok); }
+  #log .err { color: var(--err); }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .progress { margin-top: 10px; height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; display: none; }
+  .progress > div { height: 100%; background: var(--primary); width: 0; transition: width .2s; }
+</style>
+</head>
+<body>
+  <h1>HTML → Figma 原型导入</h1>
+  <div class="sub">把本地 HTML 原型文件转为可编辑的 Figma 页面</div>
+
+  <div class="field">
+    <label>1. 选择 HTML 文件</label>
+    <input type="file" id="file" accept=".html,.htm">
+  </div>
+
+  <div class="field">
+    <div class="row">
+      <label style="margin:0">2. 设计稿宽度 (px)</label>
+      <input type="number" id="width" value="1280" min="320" step="10">
+    </div>
+    <div class="hint">iframe 渲染宽度；前台站点设计稿常为 1280 / 1440</div>
+  </div>
+
+  <div class="field">
+    <label>3. 要导出的路由 / 页面（每行一个，支持 #/ 前缀）</label>
+    <textarea id="routes" placeholder="每行一个路由，如 #/home"></textarea>
+    <div class="hint">默认自动填充本文件支持的全部路由；无需全部时可删减</div>
+  </div>
+
+  <button class="btn-primary" id="go" disabled>生成到 Figma</button>
+  <div class="progress" id="progress"><div id="progressBar"></div></div>
+  <div id="log"></div>
+
+  <script>"use strict";
+(() => {
+  // src/ui/main.ts
+  var $ = (id) => document.getElementById(id);
+  var fileInput = $("file");
+  var widthInput = $("width");
+  var routesInput = $("routes");
+  var goBtn = $("go");
+  var logEl = $("log");
+  var progressEl = $("progress");
+  var progressBar = $("progressBar");
+  var htmlText = "";
+  var iframe = null;
+  var pagesList = [];
+  function log(text, cls = "") {
+    const div = document.createElement("div");
+    if (cls) div.className = cls;
+    div.textContent = text;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setProgress(pct) {
+    progressEl.style.display = "block";
+    progressBar.style.width = pct + "%";
+  }
+  var INJECTED_SCRIPT = '"use strict";(()=>{(function(){function C(t){return new Promise(function(e){setTimeout(e,t)})}function b(t){try{var e=getComputedStyle(t);if(e.display==="none"||e.visibility==="hidden"||e.opacity==="0")return!1;var r=t.getBoundingClientRect();return r.width>.5&&r.height>.5}catch{return!1}}function u(t,e){try{return getComputedStyle(t)[e]}catch{return""}}function m(t){var e;if(!t)return null;if(t[0]==="#"){var r=t.length===4?t[1]+t[1]+t[2]+t[2]+t[3]+t[3]+"ff":t.length===7?t.slice(1)+"ff":t.slice(1);return"#"+r}if(e=t.match(/rgba?\\(([\\d.]+)[,\\s]+([\\d.]+)[,\\s]+([\\d.]+)(?:[,\\s/]+([\\d.]+))?\\)/),!e)return null;var i=Math.round(Number(e[1])),a=Math.round(Number(e[2])),c=Math.round(Number(e[3])),d=e[4]!==void 0?Math.round(Number(e[4])*255):255;if(d===0)return null;var o=function(n){var h=n.toString(16);return h.length===1?"0"+h:h};return"#"+o(i)+o(a)+o(c)+o(d)}function T(t){var e=t.tagName,r=[].slice.call(t.children);if(r.length===0)return t.textContent.trim().length>0;if(/^(P|H1|H2|H3|H4|H5|H6|A|SPAN|STRONG|EM|B|I|LI|LABEL|BUTTON)$/i.test(e)){var i=r.every(function(a){var c=u(a,"display");return c.indexOf("inline")>=0&&c!=="inline-block"&&c!=="inline-flex"});return i&&t.innerText.trim().length>0}return!1}function l(t,e){var r=parseFloat(t);return isFinite(r)?r:e}function A(t){var e=u(t,"fontFamily")||"",r=e.split(",")[0].trim().replace(/^["\']|["\']$/g,"");return r}function p(t,e){var r=t.getBoundingClientRect(),i=e.getBoundingClientRect(),a=r.left-i.left,c=r.top-i.top,d=r.width,o=r.height,n={kind:"frame",tag:t.tagName.toLowerCase(),name:t.tagName.toLowerCase(),x:a,y:c,width:d,height:o,opacity:l(u(t,"opacity"),1)},h=m(u(t,"backgroundColor"));h&&(n.background=h);var g=l(u(t,"borderRadius"),0);if(g>0&&(n.cornerRadius=g),t.tagName==="IMG"){n.kind="image",n.name="\\u56FE\\u7247";try{var f=document.createElement("canvas");if(f.width=t.naturalWidth||d,f.height=t.naturalHeight||o,f.width>0&&f.height>0){var w=f.getContext("2d");w&&(w.drawImage(t,0,0,f.width,f.height),n.imageDataUrl=f.toDataURL("image/png"))}}catch{}return n}if(t.tagName==="PICTURE"){var x=t.querySelector("img");return x?p(x,e):(n.kind="rect",n.background="#E5E7EB",n)}if(t.tagName==="SVG"||t.tagName==="CANVAS")return n.kind="rect",n.name="\\u77E2\\u91CF\\u5360\\u4F4D",n.background=n.background||"#E5E7EB",n;if(t.tagName==="INPUT"||t.tagName==="TEXTAREA")return n.kind="rect",n.name="\\u8F93\\u5165\\u6846",n.background=n.background||"#FFFFFF",g>0&&(n.cornerRadius=g),n;if(t.tagName==="HR")return n.kind="line",n.name="\\u5206\\u5272\\u7EBF",n.background=n.background||"#000000",n;if(T(t)){n.kind="text",n.name="\\u6587\\u672C",n.chars=(t.innerText||"").replace(/\\n\\s*/g,`\n`).trim();var E=l(u(t,"fontSize"),14);n.fontSize=E,n.fontFamily=A(t),n.fontWeight=l(u(t,"fontWeight"),400);var s=l(u(t,"lineHeight"),0);if(s>0){var S=u(t,"lineHeight");S.indexOf("px")<0&&S.indexOf("normal")<0&&(s=s*E),n.lineHeight=s}var v=l(u(t,"letterSpacing"),0);isFinite(v)&&Math.abs(v)>.01&&(n.letterSpacing=v),n.textAlign=u(t,"textAlign")||"left";var N=u(t,"alignItems");return N==="center"?n.textAlignVertical="middle":N==="flex-end"?n.textAlignVertical="bottom":n.textAlignVertical="top",n.textColor=m(u(t,"color"))||"#000000ff",n}return n.children=[],[].slice.call(t.children).forEach(function(y){if(b(y)){var k=p(y,e);k&&n.children.push(k)}}),n}function H(t){var e=(t||"").replace(/^#\\/?/,"")||"home",r=e.split("/").filter(function(i){return i.length});return r.map(function(i){return i.charAt(0).toUpperCase()+i.slice(1)}).join("-")}function R(){var t=[];function e(i){try{location.hash=i.replace(/^#\\/?/,"");var a=document.getElementById("app");return!!(a&&a.innerHTML&&a.innerHTML.trim().length>0)}catch{return!1}}var r=[];r.push("#/home"),r.push("#/write-for-us");try{window.SITES&&window.SITES.length&&window.SITES.forEach(function(i){r.push("#/site/"+i.id)}),window.ARTICLES&&window.ARTICLES.length&&r.push("#/article/"+window.ARTICLES[0].id)}catch{}return["console","console/factory","console/publish-queue","console/submissions","console/sites","console/templates","console/seo","console/finance","console/settings"].forEach(function(i){r.push("#/"+i)}),r.forEach(function(i){e(i)&&t.push(i)}),t}function I(t){location.hash=t.replace(/^#\\/?/,"");var e=document.getElementById("app");if(!e)return null;var r=[];[].slice.call(e.children).forEach(function(d){if(b(d)){var o=p(d,e);o&&(!o.children||o.children.length>0||o.kind!=="frame"||o.background)&&r.push(o)}});var i=Math.max(e.scrollWidth,document.documentElement.clientWidth,1),a=Math.max(e.scrollHeight,e.getBoundingClientRect().height,1),c=m(getComputedStyle(document.body).backgroundColor);return{name:H(t),width:i,height:a,background:c||null,nodes:r}}window.addEventListener("message",function(t){var e=t.data||{};if(e.channel==="html2figma"){var r=function(i){try{t.source.postMessage(i,"*")}catch{}};if(e.type==="routes")try{r({channel:"html2figma",type:"routes",id:e.id,routes:R()})}catch(i){r({channel:"html2figma",type:"routes",id:e.id,routes:[],error:String(i)})}else e.type==="extract"&&C(150).then(function(){try{var i=I(e.hash);r({channel:"html2figma",type:"extract",id:e.id,result:i})}catch(a){r({channel:"html2figma",type:"extract",id:e.id,result:null,error:String(a)})}})}})})();})();\n';
+  var SHIM_SCRIPT = `<script>
+(function(){try{
+  var orig = history.replaceState.bind(history);
+  history.replaceState = function(s, t, url){
+    try { return orig(s, t, url); }
+    catch(e){ if(url && url.indexOf('#') === 0){ location.hash = url.slice(1); } else if(url){ location.hash = String(url).split('#')[1] || ''; } }
+  };
+}catch(e){}})();
+<\/script>`;
+  function buildSrcdoc(html) {
+    let doc = html.replace("</head>", SHIM_SCRIPT + "</head>");
+    const idx = doc.lastIndexOf("</body>");
+    if (idx >= 0) {
+      doc = doc.slice(0, idx) + "<script>" + INJECTED_SCRIPT + "<\/script></body>" + doc.slice(idx + "</body>".length);
+    } else {
+      doc += "<script>" + INJECTED_SCRIPT + "<\/script>";
+    }
+    return doc;
+  }
+  function normalizeRoute(r) {
+    r = r.trim();
+    if (!r) return "";
+    if (r.startsWith("#")) return r;
+    if (r.startsWith("/")) return "#" + r;
+    return "#/" + r;
+  }
+  var msgId = 0;
+  var pending = /* @__PURE__ */ new Map();
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (d && d.channel === "html2figma" && d.id != null && pending.has(d.id)) {
+      const resolve = pending.get(d.id);
+      pending.delete(d.id);
+      resolve(d);
+    }
+  });
+  function callIframe(type, payload) {
+    return new Promise((resolve) => {
+      const id = ++msgId;
+      pending.set(id, resolve);
+      iframe.contentWindow.postMessage({ channel: "html2figma", type, id, ...payload }, "*");
+      setTimeout(() => {
+        if (pending.has(id)) {
+          pending.delete(id);
+          resolve({ error: "timeout" });
+        }
+      }, 12e3);
+    });
+  }
+  function createIframe(width) {
+    return new Promise((resolve) => {
+      const f = document.createElement("iframe");
+      f.style.cssText = `position:fixed;left:-30000px;top:0;width:${width}px;height:900px;border:0;background:#fff;`;
+      f.addEventListener("load", () => setTimeout(resolve, 500));
+      f.srcdoc = buildSrcdoc(htmlText);
+      document.body.appendChild(f);
+      iframe = f;
+    });
+  }
+  function ensureIframe() {
+    const desired = parseInt(widthInput.value, 10) || 1280;
+    if (!iframe) return createIframe(desired);
+    if (Math.abs(parseFloat(iframe.style.width) - desired) > 1) {
+      iframe.remove();
+      iframe = null;
+      return createIframe(desired);
+    }
+    return Promise.resolve();
+  }
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    log("\u8BFB\u53D6\u6587\u4EF6\uFF1A" + file.name);
+    htmlText = await file.text();
+    const trimmed = htmlText.trim();
+    log("\u6587\u4EF6\u5927\u5C0F\uFF1A" + (htmlText.length / 1024).toFixed(1) + " KB", "ok");
+    goBtn.disabled = false;
+    await ensureIframe();
+    log("\u6B63\u5728\u63A2\u6D4B\u53EF\u7528\u8DEF\u7531\u2026");
+    const res = await callIframe("routes", {});
+    if (res.error || !res.routes || res.routes.length === 0) {
+      log("\u81EA\u52A8\u63A2\u6D4B\u5931\u8D25\uFF1A" + (res.error || "\u672A\u53D1\u73B0\u8DEF\u7531") + "\uFF08\u53EF\u624B\u52A8\u586B\u5199\u8DEF\u7531\uFF09", "err");
+      return;
+    }
+    routesInput.value = res.routes.join("\n");
+    log("\u63A2\u6D4B\u5230 " + res.routes.length + " \u4E2A\u8DEF\u7531", "ok");
+  });
+  goBtn.addEventListener("click", async () => {
+    if (!htmlText) {
+      log("\u8BF7\u5148\u9009\u62E9 HTML \u6587\u4EF6", "err");
+      return;
+    }
+    const routes = routesInput.value.split("\n").map(normalizeRoute).filter(Boolean);
+    const wanted = parseInt(widthInput.value, 10) || 1280;
+    if (routes.length === 0) {
+      log("\u8BF7\u81F3\u5C11\u586B\u5199\u4E00\u4E2A\u8DEF\u7531", "err");
+      return;
+    }
+    goBtn.disabled = true;
+    log("\u5F00\u59CB\u63D0\u53D6 " + routes.length + " \u4E2A\u9875\u9762\u2026");
+    setProgress(0);
+    pagesList = [];
+    for (let i = 0; i < routes.length; i++) {
+      const r = routes[i];
+      const res = await callIframe("extract", { hash: r });
+      setProgress(Math.round((i + 1) / routes.length * 50));
+      if (res.error || !res.result) {
+        log("\u8DF3\u8FC7 " + r + "\uFF1A" + (res.error || "\u63D0\u53D6\u5931\u8D25"), "err");
+        continue;
+      }
+      pagesList.push(res.result);
+      log("\u2713 " + res.result.name + " (" + res.result.width + "\xD7" + res.result.height + ", " + countNodes(res.result.nodes) + " \u4E2A\u8282\u70B9)");
+    }
+    if (pagesList.length === 0) {
+      log("\u6CA1\u6709\u63D0\u53D6\u5230\u4EFB\u4F55\u9875\u9762", "err");
+      goBtn.disabled = false;
+      return;
+    }
+    log("\u63D0\u4EA4\u7ED9 Figma \u751F\u6210\u2026");
+    parent.postMessage({ pluginMessage: { type: "create-frames", pages: pagesList } }, "*");
+  });
+  function countNodes(nodes) {
+    let c = 0;
+    const walk = (ns) => {
+      for (const n of ns) {
+        c++;
+        if (n.children) walk(n.children);
+      }
+    };
+    walk(nodes);
+    return c;
+  }
+  window.addEventListener("message", (e) => {
+    const pm = e.data.pluginMessage;
+    if (!pm) return;
+    if (pm.type === "status") {
+      log(pm.text);
+    } else if (pm.type === "progress") {
+      setProgress(50 + Math.round(pm.done / pm.total * 50));
+    } else if (pm.type === "done") {
+      setProgress(100);
+      log(`\u5B8C\u6210\uFF1A\u521B\u5EFA ${pm.pages} \u4E2A\u9875\u9762\u3001${pm.created} \u4E2A\u8282\u70B9`, "ok");
+      goBtn.disabled = false;
+    } else if (pm.type === "error") {
+      log("\u751F\u6210\u5931\u8D25\uFF1A" + pm.text, "err");
+      goBtn.disabled = false;
+    }
+  });
+  log("\u9009\u62E9 HTML \u6587\u4EF6\u540E\u81EA\u52A8\u63A2\u6D4B\u9875\u9762\u8DEF\u7531\u3002");
+})();
+</script>
+</body>
+</html>
